@@ -1,0 +1,28 @@
+# Exclude system files
+.DS_Store
+Thumbs.db
+
+# Build files
+/build/
+/dist/
+*.o
+*.exe
+*.class
+
+# Dependencies
+/node_modules/
+/.venv/
+
+# Logs
+*.log
+
+# IDE / editor settings
+*.sublime-workspace
+*.sublime-project
+.vscode/
+.idea/
+
+# Temporary and cache files
+*.tmp
+*.temp
+*.cache
