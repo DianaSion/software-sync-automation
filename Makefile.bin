@@ -1,0 +1,80 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+# 3. Neither the names of the above-listed copyright holders nor the
+#    names of any contributors may be be used to endorse or promote
+#    products derived from this software without specific prior written
+#    permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
+# HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+# OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+# AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
+# WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+.KEEP_STATE:
+
+include ../Makefile.com
+
+CVTOBJS = $(CVTSRCS:%.c=%.o)
+APIOBJS = $(APISRCS:%.c=%.o)
+NDISOBJS = $(NDISSRCS:%.c=%.o)
+
+$(NDIS) :=	CFLAGS =  -g -O2 -D_KERNEL -D__i386__ -I../include -I.
+#$(NDIS) :=	CFLAGS =  -g -D_KERNEL -D__i386__ -I../include -I.
+$(NDISAPI) :=	CFLAGS = -g -O -D_KERNEL -D__i386__ -I../include
+$(NDISCVT) :=	CFLAGS = -I../include -O
+
+inf-parse.o:
+	$(YACC) -d -v ../inf-parse.y
+	mv y.tab.c inf-parse.c
+	$(CC) $(CFLAGS) -c inf-parse.c -o inf-parse.o
+
+inf-token.o: inf-parse.o
+	rm -f inf-token.c
+	$(LEX) -t ../inf-token.l > inf-token.c
+	$(CC) $(CFLAGS) -c inf-token.c -o inf-token.o
+
+%.o: ../%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+ndiscvt: $(CVTOBJS)
+	$(CC) $(CFLAGS) -o ndiscvt $(CVTOBJS)
+
+ndis: $(NDISOBJS)
+	$(CTFCVT) $(CTFLAGS) if_ndis.o
+	$(CTFCVT) $(CTFLAGS) ndis_prop.o
+	$(LD) -r -o bcmndis if_ndis.o ndis_prop.o
+	$(CTFMERG) -l NDISWRAPPER -o bcmndis bcmndis
+
+ndisapi: $(APIOBJS)
+	$(CTFCVT) $(CTFLAGS) subr_ndis.o
+	$(CTFCVT) $(CTFLAGS) subr_ntoskrnl.o
+	$(CTFCVT) $(CTFLAGS) subr_pe.o
+	$(CTFCVT) $(CTFLAGS) subr_hal.o
+	$(CTFCVT) $(CTFLAGS) kern_ndis.o
+	$(CTFCVT) $(CTFLAGS) kern_windrv.o
+	$(LD) -r -o $@ $(APIOBJS)
+	$(CTFMERG) -l NDISWRAPPER -o $@ $(APIOBJS)
+
+all: ndiscvt ndis ndisapi
+
+clean:
+	rm -rf *.o ndiscvt inf-parse.c y.tab.h y.output inf-token.c bcmndis ndisapi
